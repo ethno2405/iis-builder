@@ -1,28 +1,34 @@
-param ([string]$path)
+param ([string]$path, [string]$config)
 
-$script = $myinvocation.mycommand.definition
-$dir = Split-Path $MyInvocation.MyCommand.Path
-Write-Host "Script location $script"
-Write-Host "Script started in $dir"
+function get-path-or-default([string]$from, [string]$default) {
+    if([string]::IsNullOrWhiteSpace($from)) {
+        Write-Host "Using default: $default"
+        return $default
+    }
 
-if((![string]::IsNullOrWhiteSpace($path))) {
-    if((Test-Path $path)){
-        if([System.IO.Path]::IsPathRooted($path)){
-            $dir = $path
+    if((Test-Path $from)){
+        if([System.IO.Path]::IsPathRooted($from)){
+            return $from
         }
         else {
-            $dir = Resolve-Path -Path $path
+            return Resolve-Path -Path $from
         }
-        Write-Host "Path has been supplied passing in: $dir as working directory"
     }
     else {
-        Write-Host "Unable to locate $path please provide a valid path"
+        Write-Error "Specified path $from was not found."
         exit
     }
 }
 
-if ((Test-Path "$dir\iis-config.json") -eq $false){
-    Write-Host "Could not find iis-config.json in $dir"
+$script = $myinvocation.mycommand.definition
+$dir = get-path-or-default -from $path -default (Split-Path $MyInvocation.MyCommand.Path)
+$configFile = get-path-or-default -from $config -default "$dir\iis-config.json"
+Write-Host "Script location $script"
+Write-Host "Config location $configFile"
+Write-Host "Script started in $dir"
+
+if ((Test-Path "$configFile") -eq $false){
+    Write-Error "Could not find config file $configFile"
     exit
 }
 
@@ -249,7 +255,7 @@ Import-Module WebAdministration
 $hostsPath = "C:\Windows\System32\drivers\etc\hosts"
 Write-Host "Starting in $dir"
 #Load JSON
-$iisconfig = Get-Content  "$dir\iis-config.json" | Out-String | ConvertFrom-Json
+$iisconfig = Get-Content  "$configFile" | Out-String | ConvertFrom-Json
 
 $iis = [pscustomobject]@{
     siteName = $iisconfig."IIS-Site-Name"
