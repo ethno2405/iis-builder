@@ -23,6 +23,20 @@ function get-path-or-default([string]$from, [string]$default) {
 $script = $myinvocation.mycommand.definition
 $dir = get-path-or-default -from $path -default (Split-Path $MyInvocation.MyCommand.Path)
 $configFile = get-path-or-default -from $config -default "$dir\iis-config.json"
+
+#Ensure our script is elevated to Admin permissions
+If (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
+{
+    Write-Host "Script has been opened without Admin permissions, attempting to restart as admin"
+    $arguments = "-noexit & '" + $script + "'","-path $dir -config $configFile"
+    Start-Process powershell -Verb runAs -ArgumentList $arguments
+    Break
+}
+# Known limitations:
+# - does not handle entries with comments afterwards ("<ip>    <host>    # comment")
+# https://stackoverflow.com/questions/2602460/powershell-to-manipulate-host-file
+#
+
 Write-Host "Script location $script"
 Write-Host "Config location $configFile"
 Write-Host "Script started in $dir"
@@ -31,19 +45,6 @@ if ((Test-Path "$configFile") -eq $false){
     Write-Error "Could not find config file $configFile"
     exit
 }
-
-#Ensure our script is elevated to Admin permissions
-If (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
-{
-    Write-Host "Script has been opened without Admin permissions, attempting to restart as admin"
-    $arguments = "-noexit & '" + $script + "'","-path $dir"
-    Start-Process powershell -Verb runAs -ArgumentList $arguments
-    Break
-}
-# Known limitations:
-# - does not handle entries with comments afterwards ("<ip>    <host>    # comment")
-# https://stackoverflow.com/questions/2602460/powershell-to-manipulate-host-file
-#
 
 function add-host([string]$filename, [string]$ip, [string]$hostname) {
     remove-host $filename $hostname
