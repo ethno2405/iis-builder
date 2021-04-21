@@ -28,14 +28,10 @@ $configFile = get-path-or-default -from $config -default "$dir\iis-config.json"
 If (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
 {
     Write-Host "Script has been opened without Admin permissions, attempting to restart as admin"
-    $arguments = "-noexit & '" + $script + "'","-path $dir -config $configFile"
+    $arguments = "-noexit & '" + $script + "'","-path '$dir' -config '$configFile'"
     Start-Process powershell -Verb runAs -ArgumentList $arguments
     Break
 }
-# Known limitations:
-# - does not handle entries with comments afterwards ("<ip>    <host>    # comment")
-# https://stackoverflow.com/questions/2602460/powershell-to-manipulate-host-file
-#
 
 Write-Host "Script location $script"
 Write-Host "Config location $configFile"
@@ -46,6 +42,10 @@ if ((Test-Path "$configFile") -eq $false){
     exit
 }
 
+# Known limitations:
+# - does not handle entries with comments afterwards ("<ip>    <host>    # comment")
+# https://stackoverflow.com/questions/2602460/powershell-to-manipulate-host-file
+#
 function add-host([string]$filename, [string]$ip, [string]$hostname) {
     remove-host $filename $hostname
     $ip + "`t`t" + $hostname | Out-File -encoding ASCII -append $filename
